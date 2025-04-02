@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三国杀编辑器简易工具 - 非官方</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --primary: #2196F3;
+            --success: #4CAF50;
+            --warning: #FF9800;
+            --error: #f44336;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background: #f5f7fa;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 800px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .upload-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .upload-card {
+            border: 2px dashed #ddd;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+            background: #f8f9ff;
+        }
+
+        .upload-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-info {
+            margin-top: 1rem;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        button {
+            padding: 1rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .process-btn {
+            background: var(--primary);
+            color: white;
+        }
+
+        .process-btn:hover {
+            filter: brightness(1.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .process-btn:disabled {
+            background: #90CAF9;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            display: none;
+            text-align: center;
+        }
+
+        .loading { background: #e3f2fd; color: var(--primary); }
+        .success { background: #e8f5e9; color: var(--success); }
+        .error { background: #ffebee; color: var(--error); }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🔗 三国杀编辑器简易工具 - 非官方 v1.0.0</h1>
+
+    <div class="upload-group">
+        <div class="upload-card" onclick="triggerUpload(1)">
+            <p>📤 点击上传地图文件1</p>
+            <div class="file-info" id="file1-info">未选择文件</div>
+            <input type="file" class="file-input" id="file1" accept=".msgs" data-id="1">
+        </div>
+
+        <div class="upload-card" onclick="triggerUpload(2)">
+            <p>📤 点击上传地图文件2（可留空）</p>
+            <div class="file-info" id="file2-info">未选择文件</div>
+            <input type="file" class="file-input" id="file2" accept=".msgs" data-id="2">
+        </div>
+    </div>
+
+    <div class="actions">
+        <button class="process-btn process-btn-simple" onclick="processFiles('clone')" id="btn-clone" disabled>
+            🧩 获取地图1的副本（清除UUID和版本号、版本描述）
+        </button>
+<!--        <button class="process-btn process-btn-simple" onclick="processFiles('base-ai')" id="btn-base-ai" disabled>-->
+<!--            🔄 自动绑定地图1中"桃、酒、无懈"的AI价值函数（来源=小诺）-->
+<!--        </button>-->
+        <button class="process-btn" onclick="processFiles('copy-ai')" id="btn-copy-ai" disabled>
+            🔍 将地图2的所有AI价值函数克隆至地图1（不会覆盖原有的）
+        </button>
+    </div>
+
+    <div class="status loading" id="loadingStatus">
+        ⏳ 待处理...
+    </div>
+
+    <div class="status success" id="successStatus">
+        ✅ 处理完成！开始下载...
+    </div>
+
+    <div class="status error" id="errorStatus">
+        ❌ 处理失败：<span id="errorMsg"></span>
+    </div>
+</div>
+
+<script>
+    let loadedFiles = {
+        file1: null,
+        file2: null
+    };
+
+    // 触发文件选择
+    function triggerUpload(id) {
+        document.getElementById(`file${id}`).click();
+    }
+
+    // 初始化文件监听
+    document.querySelectorAll('.file-input').forEach(input => {
+        input.addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            const id = this.dataset.id;
+
+            if (!validateFile(file)) {
+                showError(`文件[${file?.name}]不符合要求`);
+                this.value = '';
+                return;
+            }
+
+            try {
+                showLoading();
+                loadedFiles[`file${id}`] = await JSZip.loadAsync(file);
+                updateFileInfo(id, file);
+                checkReadyState();
+            } catch (err) {
+                showError(`文件[${file.name}]读取失败：${err.message}`);
+            }
+        });
+    });
+
+    // 验证文件有效性
+    function validateFile(file) {
+        if (!file) return false;
+
+        // 扩展名验证
+        const validExtension = file.name.endsWith('.msgs');
+
+        // 文件类型验证
+        //const validType = [
+        //    'application/zip',
+        //    'application/x-zip-compressed'
+        //].includes(file.type);
+
+        return validExtension;
+    }
+
+    // 更新文件信息
+    function updateFileInfo(id, file) {
+        const infoEl = document.getElementById(`file${id}-info`);
+        infoEl.innerHTML = `
+            ${file.name}<br>
+            <small>${(file.size/1024/1024).toFixed(2)} MB</small>
+        `;
+    }
+
+    // 检查就绪状态
+    function checkReadyState() {
+        const isAllReady = loadedFiles.file1 && loadedFiles.file2;
+        const isReady = loadedFiles.file1;
+        document.querySelectorAll('.process-btn').forEach(btn => {
+            btn.disabled = !isAllReady;
+        });
+        document.querySelectorAll('.process-btn-simple').forEach(btn => {
+            btn.disabled = !isReady;
+        });
+    }
+
+    // 文件处理核心
+    async function processFiles(mode) {
+        showLoading();
+        try {
+            const newZip = new JSZip();
+            const [zip1, zip2] = [loadedFiles.file1, loadedFiles.file2];
+            newZip.files = {...zip1.files};
+            var x;
+
+            switch(mode) {
+                case 'clone':
+                    const mapInfoJSON = await newZip.file("edit/mapInfo.json").async("string");
+                    var mapInfo = JSON.parse(mapInfoJSON);
+                    mapInfo["map_uuid"] = "";
+                    mapInfo["version"] = "0_0";
+                    mapInfo["desc"] = "";
+                    mapInfo["desc_format"] = "";
+                    const resClone = JSON.stringify(mapInfo);
+                    newZip.file("edit/mapInfo.json", resClone);
+                    newZip.file("client/mapInfo.json", resClone);
+                    break;
+                case 'base-ai':
+                    break;
+                case 'copy-ai':
+                    const gameConfig1JSON = await newZip.file("edit/gameConfig.json").async("string");
+                    const gameConfig2JSON = await zip2.file("edit/gameConfig.json").async("string");
+                    var gameConfig1 = JSON.parse(gameConfig1JSON);
+                    var gameConfig2 = JSON.parse(gameConfig2JSON);
+                    var oriConfigs = gameConfig1["ai_value_config"]["values"];
+                    var newConfigs = gameConfig2["ai_value_config"]["values"];
+                    var keys = [];
+                    for (x in oriConfigs) {
+                        keys.push(oriConfigs[x]["key"]);
+                    }
+                    for (x in newConfigs) {
+                        var i = 800001;
+                        while (keys.indexOf(i) != -1) {
+                            i++;
+                        }
+                        keys.push(i);
+                        newConfigs[x]["key"] = i;
+                        oriConfigs.push(newConfigs[x]);
+                    }
+                    var oriDir = gameConfig1["ai_value_config"]["dir"];
+                    var newDir = gameConfig2["ai_value_config"]["dir"];
+                    var dirKeys = [];
+                    for (x in oriDir) {
+                        dirKeys.push(oriDir[x]["key"]);
+                    }
+                    for (x in newDir) {
+                        var i = 1;
+                        while (dirKeys.indexOf(i) != -1) {
+                            i++;
+                        }
+                        dirKeys.push(i);
+                        newDir[x]["key"] = i;
+                        oriDir.push(newDir[x]);
+                    }
+                    gameConfig1["ai_value_config"]["values"] = oriConfigs;
+                    gameConfig1["ai_value_config"]["dir"] = oriDir;
+                    const resCopy = JSON.stringify(gameConfig1);
+                    newZip.file("edit/gameConfig.json", resCopy);
+                    break;
+            }
+
+            // 生成并下载
+            const content = await newZip.generateAsync({type: "blob", compression: "DEFLATE"});
+            var fileNameRaw = document.getElementById(`file1-info`).innerText;
+            fileNameRaw = fileNameRaw.substring(0, fileNameRaw.indexOf('.msgs'));
+            downloadFile(content, `${fileNameRaw}_${Date.now()}.msgs`);
+            showSuccess();
+
+        } catch (err) {
+            showError(`处理失败：${err.message}`);
+        }
+    }
+
+    // 文件下载
+    function downloadFile(content, filename) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        link.download = filename;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 100);
+    }
+
+    // UI控制
+    function showLoading() {
+        document.querySelectorAll('.status').forEach(el => el.style.display = 'none');
+        document.getElementById('loadingStatus').style.display = 'block';
+    }
+
+    function showSuccess() {
+        document.querySelectorAll('.status').forEach(el => el.style.display = 'none');
+        document.getElementById('successStatus').style.display = 'block';
+        setTimeout(() => document.getElementById('successStatus').style.display = 'none', 3000);
+    }
+
+    function showError(msg) {
+        document.querySelectorAll('.status').forEach(el => el.style.display = 'none');
+        document.getElementById('errorMsg').textContent = msg;
+        document.getElementById('errorStatus').style.display = 'block';
+    }
+</script>
+</body>
+</html>
