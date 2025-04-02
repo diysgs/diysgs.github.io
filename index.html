@@ -45,6 +45,13 @@
             margin-bottom: 2rem;
         }
 
+        h2 {
+            color: #2c3e50;
+            text-align: right;
+            margin-bottom: 2rem;
+        }
+
+
         .upload-group {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -128,7 +135,8 @@
 </head>
 <body>
 <div class="container">
-    <h1>🔗 三国杀编辑器简易工具 - 非官方 v1.0.0</h1>
+    <h1>🔗 三国杀编辑器简易工具 - 非官方 v1.1.0</h1>
+    <h2>难得不糊涂</h2>
 
     <div class="upload-group">
         <div class="upload-card" onclick="triggerUpload(1)">
@@ -148,9 +156,9 @@
         <button class="process-btn process-btn-simple" onclick="processFiles('clone')" id="btn-clone" disabled>
             🧩 获取地图1的副本（清除UUID和版本号、版本描述）
         </button>
-<!--        <button class="process-btn process-btn-simple" onclick="processFiles('base-ai')" id="btn-base-ai" disabled>-->
-<!--            🔄 自动绑定地图1中"桃、酒、无懈"的AI价值函数（来源=小诺）-->
-<!--        </button>-->
+        <button class="process-btn" onclick="processFiles('replace-ai')" id="btn-replace-ai" disabled>
+            🔄 将地图2的所有AI价值函数替换至地图1并自动绑定相同技能（会清空地图1原有AI价值函数）
+        </button>
         <button class="process-btn" onclick="processFiles('copy-ai')" id="btn-copy-ai" disabled>
             🔍 将地图2的所有AI价值函数克隆至地图1（不会覆盖原有的）
         </button>
@@ -240,8 +248,16 @@
         });
     }
 
+    // 禁止所有按钮
+    function disableAllBtn() {
+        document.querySelectorAll('.process-btn').forEach(btn => {
+            btn.disabled = true;
+        });
+    }
+
     // 文件处理核心
     async function processFiles(mode) {
+        disableAllBtn();
         showLoading();
         try {
             const newZip = new JSZip();
@@ -261,8 +277,58 @@
                     newZip.file("edit/mapInfo.json", resClone);
                     newZip.file("client/mapInfo.json", resClone);
                     break;
-                case 'base-ai':
+
+                case 'replace-ai':
+                    const gameConfig1JSON0 = await newZip.file("edit/gameConfig.json").async("string");
+                    const gameConfig2JSON0 = await zip2.file("edit/gameConfig.json").async("string");
+                    var gameConfig10 = JSON.parse(gameConfig1JSON0);
+                    var gameConfig20 = JSON.parse(gameConfig2JSON0);
+                    gameConfig10["ai_value_config"] = gameConfig20["ai_value_config"];
+
+                    var cardAIUseValue1 = gameConfig10["tempData"]["value"]["card_template_config"]["cardTemplate"];
+                    var cardAIUseValue2 = gameConfig20["tempData"]["value"]["card_template_config"]["cardTemplate"];
+                    const needCardAIMap = new Map();
+                    const needCardNameMap = new Map();
+                    for (x in cardAIUseValue2) {
+                        if (cardAIUseValue2[x].hasOwnProperty("aiUseValue")) {
+                            needCardAIMap.set(cardAIUseValue2[x]["id"], cardAIUseValue2[x]["aiUseValue"]);
+                            needCardNameMap.set(cardAIUseValue2[x]["id"], cardAIUseValue2[x]["name"]);
+                        }
+                    }
+                    for (x in cardAIUseValue1) {
+                        if (cardAIUseValue1[x].hasOwnProperty("aiUseValue")) {
+                            delete cardAIUseValue1[x]["aiUseValue"];
+                        }
+                        if (needCardNameMap.get(cardAIUseValue1[x]["id"]) === cardAIUseValue1[x]["name"]) {
+                            cardAIUseValue1[x]["aiUseValue"] = needCardAIMap.get(cardAIUseValue1[x]["id"]);
+                        }
+                    }
+                    gameConfig10["tempData"]["value"]["card_template_config"]["cardTemplate"] = cardAIUseValue1;
+
+                    var skillAIUseValue1 = gameConfig10["tempData"]["value"]["skill_config"]["skills"];
+                    var skillAIUseValue2 = gameConfig20["tempData"]["value"]["skill_config"]["skills"];
+                    const needSkillAIMap = new Map();
+                    const needSkillNameMap = new Map();
+                    for (x in skillAIUseValue2) {
+                        if (skillAIUseValue2[x].hasOwnProperty("aiUseValue")) {
+                            needSkillAIMap.set(skillAIUseValue2[x]["key"], skillAIUseValue2[x]["aiUseValue"]);
+                            needSkillNameMap.set(skillAIUseValue2[x]["key"], skillAIUseValue2[x]["skill_name"]);
+                        }
+                    }
+                    for (x in skillAIUseValue1) {
+                        if (skillAIUseValue1[x].hasOwnProperty("aiUseValue")) {
+                            delete skillAIUseValue1[x]["aiUseValue"];
+                        }
+                        if (needSkillNameMap.get(skillAIUseValue1[x]["key"]) === skillAIUseValue1[x]["skill_name"]) {
+                            skillAIUseValue1[x]["aiUseValue"] = needSkillAIMap.get(skillAIUseValue1[x]["key"]);
+                        }
+                    }
+                    gameConfig10["tempData"]["value"]["skill_config"]["skills"] = skillAIUseValue1;
+
+                    const resReplace = JSON.stringify(gameConfig10);
+                    newZip.file("edit/gameConfig.json", resReplace);
                     break;
+
                 case 'copy-ai':
                     const gameConfig1JSON = await newZip.file("edit/gameConfig.json").async("string");
                     const gameConfig2JSON = await zip2.file("edit/gameConfig.json").async("string");
@@ -311,9 +377,10 @@
             fileNameRaw = fileNameRaw.substring(0, fileNameRaw.indexOf('.msgs'));
             downloadFile(content, `${fileNameRaw}_${Date.now()}.msgs`);
             showSuccess();
-
+            checkReadyState();
         } catch (err) {
             showError(`处理失败：${err.message}`);
+            checkReadyState();
         }
     }
 
