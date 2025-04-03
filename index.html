@@ -135,7 +135,7 @@
 </head>
 <body>
 <div class="container">
-    <h1>🔗 三国杀编辑器简易工具 - 非官方 v1.1.0</h1>
+    <h1>🔗 三国杀编辑器简易工具（非官方） v1.1.2</h1>
     <h2>难得不糊涂</h2>
 
     <div class="upload-group">
@@ -265,110 +265,173 @@
             newZip.files = {...zip1.files};
             var x;
 
-            switch(mode) {
-                case 'clone':
-                    const mapInfoJSON = await newZip.file("edit/mapInfo.json").async("string");
-                    var mapInfo = JSON.parse(mapInfoJSON);
-                    mapInfo["map_uuid"] = "";
-                    mapInfo["version"] = "0_0";
-                    mapInfo["desc"] = "";
-                    mapInfo["desc_format"] = "";
-                    const resClone = JSON.stringify(mapInfo);
-                    newZip.file("edit/mapInfo.json", resClone);
-                    newZip.file("client/mapInfo.json", resClone);
-                    break;
+            if (mode === 'clone') {
+                const mapInfoJSON = await newZip.file("edit/mapInfo.json").async("string");
+                var mapInfo = JSON.parse(mapInfoJSON);
+                mapInfo["map_uuid"] = "";
+                mapInfo["version"] = "0_0";
+                mapInfo["desc"] = "";
+                mapInfo["desc_format"] = "";
+                const res = JSON.stringify(mapInfo);
+                newZip.file("edit/mapInfo.json", res);
+                newZip.file("client/mapInfo.json", res);
+            }
+            else if (mode === 'replace-ai') {
+                const gameConfig1JSON = await newZip.file("edit/gameConfig.json").async("string");
+                const gameConfig2JSON = await zip2.file("edit/gameConfig.json").async("string");
+                var gameConfig1 = JSON.parse(gameConfig1JSON);
+                var gameConfig2 = JSON.parse(gameConfig2JSON);
+                gameConfig1["ai_value_config"] = gameConfig2["ai_value_config"];
+                gameConfig1["tempData"]["value"]["ai_value_config"] = gameConfig2["tempData"]["value"]["ai_value_config"];
 
-                case 'replace-ai':
-                    const gameConfig1JSON0 = await newZip.file("edit/gameConfig.json").async("string");
-                    const gameConfig2JSON0 = await zip2.file("edit/gameConfig.json").async("string");
-                    var gameConfig10 = JSON.parse(gameConfig1JSON0);
-                    var gameConfig20 = JSON.parse(gameConfig2JSON0);
-                    gameConfig10["ai_value_config"] = gameConfig20["ai_value_config"];
+                var cardAIUseValue1 = gameConfig1["card_template_config"]["cardTemplate"];
+                var cardAIUseValueTemp1 = gameConfig1["tempData"]["value"]["card_template_config"] == null ? [] : gameConfig1["tempData"]["value"]["card_template_config"]["cardTemplate"];
+                var cardAIUseValue2 = gameConfig2["card_template_config"]["cardTemplate"];
+                var cardAIUseValueTemp2 = gameConfig2["tempData"]["value"]["card_template_config"] == null ? [] : gameConfig2["tempData"]["value"]["card_template_config"]["cardTemplate"];
+                const needCardAIMap = new Map();
+                const needCardNameMap = new Map();
+                for (x in cardAIUseValue2) {
+                    if (cardAIUseValue2[x].hasOwnProperty("aiUseValue")) {
+                        needCardAIMap.set(cardAIUseValue2[x]["id"], cardAIUseValue2[x]["aiUseValue"]);
+                        needCardNameMap.set(cardAIUseValue2[x]["id"], cardAIUseValue2[x]["name"]);
+                    }
+                }
+                for (x in cardAIUseValueTemp2) {
+                    if (cardAIUseValueTemp2[x].hasOwnProperty("aiUseValue")) {
+                        needCardAIMap.set(cardAIUseValueTemp2[x]["id"], cardAIUseValueTemp2[x]["aiUseValue"]);
+                        needCardNameMap.set(cardAIUseValueTemp2[x]["id"], cardAIUseValueTemp2[x]["name"]);
+                    }
+                }
+                for (x in cardAIUseValue1) {
+                    if (cardAIUseValue1[x].hasOwnProperty("aiUseValue")) {
+                        delete cardAIUseValue1[x]["aiUseValue"];
+                    }
+                    if (needCardNameMap.get(cardAIUseValue1[x]["id"]) === cardAIUseValue1[x]["name"]) {
+                        cardAIUseValue1[x]["aiUseValue"] = needCardAIMap.get(cardAIUseValue1[x]["id"]);
+                    }
+                }
+                for (x in cardAIUseValueTemp1) {
+                    if (cardAIUseValueTemp1[x].hasOwnProperty("aiUseValue")) {
+                        delete cardAIUseValueTemp1[x]["aiUseValue"];
+                    }
+                    if (needCardNameMap.get(cardAIUseValueTemp1[x]["id"]) === cardAIUseValueTemp1[x]["name"]) {
+                        cardAIUseValueTemp1[x]["aiUseValue"] = needCardAIMap.get(cardAIUseValueTemp1[x]["id"]);
+                    }
+                }
+                gameConfig1["card_template_config"]["cardTemplate"] = cardAIUseValue1;
+                if (gameConfig1["tempData"]["value"]["card_template_config"] != null) {
+                    gameConfig1["tempData"]["value"]["card_template_config"]["cardTemplate"] = cardAIUseValueTemp1;
+                }
 
-                    var cardAIUseValue1 = gameConfig10["tempData"]["value"]["card_template_config"]["cardTemplate"];
-                    var cardAIUseValue2 = gameConfig20["tempData"]["value"]["card_template_config"]["cardTemplate"];
-                    const needCardAIMap = new Map();
-                    const needCardNameMap = new Map();
-                    for (x in cardAIUseValue2) {
-                        if (cardAIUseValue2[x].hasOwnProperty("aiUseValue")) {
-                            needCardAIMap.set(cardAIUseValue2[x]["id"], cardAIUseValue2[x]["aiUseValue"]);
-                            needCardNameMap.set(cardAIUseValue2[x]["id"], cardAIUseValue2[x]["name"]);
-                        }
+                var skillAIUseValue1 = gameConfig1["skill_config"]["skills"];
+                var skillAIUseValueTemp1 = gameConfig1["tempData"]["value"]["skill_config"] == null ? [] : gameConfig1["tempData"]["value"]["skill_config"]["skills"];
+                var skillAIUseValue2 = gameConfig2["skill_config"]["skills"];
+                var skillAIUseValueTemp2 = gameConfig2["tempData"]["value"]["skill_config"] == null ? [] : gameConfig2["tempData"]["value"]["skill_config"]["skills"];
+                const needSkillAIMap = new Map();
+                const needSkillNameMap = new Map();
+                for (x in skillAIUseValue2) {
+                    if (skillAIUseValue2[x].hasOwnProperty("aiUseValue")) {
+                        needSkillAIMap.set(skillAIUseValue2[x]["key"], skillAIUseValue2[x]["aiUseValue"]);
+                        needSkillNameMap.set(skillAIUseValue2[x]["key"], skillAIUseValue2[x]["skill_name"]);
                     }
-                    for (x in cardAIUseValue1) {
-                        if (cardAIUseValue1[x].hasOwnProperty("aiUseValue")) {
-                            delete cardAIUseValue1[x]["aiUseValue"];
-                        }
-                        if (needCardNameMap.get(cardAIUseValue1[x]["id"]) === cardAIUseValue1[x]["name"]) {
-                            cardAIUseValue1[x]["aiUseValue"] = needCardAIMap.get(cardAIUseValue1[x]["id"]);
-                        }
+                }
+                for (x in skillAIUseValueTemp2) {
+                    if (skillAIUseValueTemp2[x].hasOwnProperty("aiUseValue")) {
+                        needSkillAIMap.set(skillAIUseValueTemp2[x]["key"], skillAIUseValueTemp2[x]["aiUseValue"]);
+                        needSkillNameMap.set(skillAIUseValueTemp2[x]["key"], skillAIUseValueTemp2[x]["skill_name"]);
                     }
-                    gameConfig10["tempData"]["value"]["card_template_config"]["cardTemplate"] = cardAIUseValue1;
+                }
+                for (x in skillAIUseValue1) {
+                    if (skillAIUseValue1[x].hasOwnProperty("aiUseValue")) {
+                        delete skillAIUseValue1[x]["aiUseValue"];
+                    }
+                    if (needSkillNameMap.get(skillAIUseValue1[x]["key"]) === skillAIUseValue1[x]["skill_name"]) {
+                        skillAIUseValue1[x]["aiUseValue"] = needSkillAIMap.get(skillAIUseValue1[x]["key"]);
+                    }
+                }
+                for (x in skillAIUseValueTemp1) {
+                    if (skillAIUseValueTemp1[x].hasOwnProperty("aiUseValue")) {
+                        delete skillAIUseValueTemp1[x]["aiUseValue"];
+                    }
+                    if (needSkillNameMap.get(skillAIUseValueTemp1[x]["key"]) === skillAIUseValueTemp1[x]["skill_name"]) {
+                        skillAIUseValueTemp1[x]["aiUseValue"] = needSkillAIMap.get(skillAIUseValueTemp1[x]["key"]);
+                    }
+                }
+                gameConfig1["skill_config"]["skills"] = skillAIUseValue1;
+                if (gameConfig1["tempData"]["value"]["skill_config"] != null) {
+                    gameConfig1["tempData"]["value"]["skill_config"]["skills"] = skillAIUseValueTemp1;
+                }
 
-                    var skillAIUseValue1 = gameConfig10["tempData"]["value"]["skill_config"]["skills"];
-                    var skillAIUseValue2 = gameConfig20["tempData"]["value"]["skill_config"]["skills"];
-                    const needSkillAIMap = new Map();
-                    const needSkillNameMap = new Map();
-                    for (x in skillAIUseValue2) {
-                        if (skillAIUseValue2[x].hasOwnProperty("aiUseValue")) {
-                            needSkillAIMap.set(skillAIUseValue2[x]["key"], skillAIUseValue2[x]["aiUseValue"]);
-                            needSkillNameMap.set(skillAIUseValue2[x]["key"], skillAIUseValue2[x]["skill_name"]);
-                        }
+                const res = JSON.stringify(gameConfig1);
+                newZip.file("edit/gameConfig.json", res);
+            }
+            else if (mode === 'copy-ai') {
+                const gameConfig1JSON = await newZip.file("edit/gameConfig.json").async("string");
+                const gameConfig2JSON = await zip2.file("edit/gameConfig.json").async("string");
+                var gameConfig1 = JSON.parse(gameConfig1JSON);
+                var gameConfig2 = JSON.parse(gameConfig2JSON);
+                var oriConfigs = gameConfig1["ai_value_config"]["values"];
+                var oriTempConfigs = gameConfig1["tempData"]["value"]["ai_value_config"] == null ? [] : gameConfig1["tempData"]["value"]["ai_value_config"]["values"];
+                var newConfigs = gameConfig2["ai_value_config"]["values"];
+                var newTempConfigs = gameConfig2["tempData"]["value"]["ai_value_config"] == null ? [] : gameConfig2["tempData"]["value"]["ai_value_config"]["values"];
+                var keys = [];
+                for (x in oriConfigs) {
+                    keys.push(oriConfigs[x]["key"]);
+                }
+                for (x in oriTempConfigs) {
+                    keys.push(oriTempConfigs[x]["key"]);
+                }
+                for (x in newConfigs) {
+                    var i = 800001;
+                    while (keys.indexOf(i) != -1) {
+                        i++;
                     }
-                    for (x in skillAIUseValue1) {
-                        if (skillAIUseValue1[x].hasOwnProperty("aiUseValue")) {
-                            delete skillAIUseValue1[x]["aiUseValue"];
-                        }
-                        if (needSkillNameMap.get(skillAIUseValue1[x]["key"]) === skillAIUseValue1[x]["skill_name"]) {
-                            skillAIUseValue1[x]["aiUseValue"] = needSkillAIMap.get(skillAIUseValue1[x]["key"]);
-                        }
+                    keys.push(i);
+                    newConfigs[x]["key"] = i;
+                    oriConfigs.push(newConfigs[x]);
+                }
+                for (x in newTempConfigs) {
+                    var i = 180000001;
+                    while (keys.indexOf(i) != -1) {
+                        i++;
                     }
-                    gameConfig10["tempData"]["value"]["skill_config"]["skills"] = skillAIUseValue1;
-
-                    const resReplace = JSON.stringify(gameConfig10);
-                    newZip.file("edit/gameConfig.json", resReplace);
-                    break;
-
-                case 'copy-ai':
-                    const gameConfig1JSON = await newZip.file("edit/gameConfig.json").async("string");
-                    const gameConfig2JSON = await zip2.file("edit/gameConfig.json").async("string");
-                    var gameConfig1 = JSON.parse(gameConfig1JSON);
-                    var gameConfig2 = JSON.parse(gameConfig2JSON);
-                    var oriConfigs = gameConfig1["ai_value_config"]["values"];
-                    var newConfigs = gameConfig2["ai_value_config"]["values"];
-                    var keys = [];
-                    for (x in oriConfigs) {
-                        keys.push(oriConfigs[x]["key"]);
+                    keys.push(i);
+                    newTempConfigs[x]["key"] = i;
+                    oriConfigs.push(newTempConfigs[x]);
+                }
+                var oriDir = gameConfig1["ai_value_config"]["dir"];
+                var oriTempDir = gameConfig1["tempData"]["value"]["ai_value_config"] == null ? [] : gameConfig1["tempData"]["value"]["ai_value_config"]["dir"];
+                var newDir = gameConfig2["ai_value_config"]["dir"];
+                var newTempDir = gameConfig2["tempData"]["value"]["ai_value_config"] == null ? [] : gameConfig2["tempData"]["value"]["ai_value_config"]["dir"];
+                var dirKeys = [];
+                for (x in oriDir) {
+                    dirKeys.push(oriDir[x]["key"]);
+                }
+                for (x in oriTempDir) {
+                    dirKeys.push(oriTempDir[x]["key"]);
+                }
+                for (x in newDir) {
+                    var i = 1;
+                    while (dirKeys.indexOf(i) != -1) {
+                        i++;
                     }
-                    for (x in newConfigs) {
-                        var i = 800001;
-                        while (keys.indexOf(i) != -1) {
-                            i++;
-                        }
-                        keys.push(i);
-                        newConfigs[x]["key"] = i;
-                        oriConfigs.push(newConfigs[x]);
+                    dirKeys.push(i);
+                    newDir[x]["key"] = i;
+                    oriDir.push(newDir[x]);
+                }
+                for (x in newTempDir) {
+                    var i = 1;
+                    while (dirKeys.indexOf(i) != -1) {
+                        i++;
                     }
-                    var oriDir = gameConfig1["ai_value_config"]["dir"];
-                    var newDir = gameConfig2["ai_value_config"]["dir"];
-                    var dirKeys = [];
-                    for (x in oriDir) {
-                        dirKeys.push(oriDir[x]["key"]);
-                    }
-                    for (x in newDir) {
-                        var i = 1;
-                        while (dirKeys.indexOf(i) != -1) {
-                            i++;
-                        }
-                        dirKeys.push(i);
-                        newDir[x]["key"] = i;
-                        oriDir.push(newDir[x]);
-                    }
-                    gameConfig1["ai_value_config"]["values"] = oriConfigs;
-                    gameConfig1["ai_value_config"]["dir"] = oriDir;
-                    const resCopy = JSON.stringify(gameConfig1);
-                    newZip.file("edit/gameConfig.json", resCopy);
-                    break;
+                    dirKeys.push(i);
+                    newTempDir[x]["key"] = i;
+                    oriDir.push(newTempDir[x]);
+                }
+                gameConfig1["ai_value_config"]["values"] = oriConfigs;
+                gameConfig1["ai_value_config"]["dir"] = oriDir;
+                const res = JSON.stringify(gameConfig1);
+                newZip.file("edit/gameConfig.json", res);
             }
 
             // 生成并下载
@@ -379,7 +442,7 @@
             showSuccess();
             checkReadyState();
         } catch (err) {
-            showError(`处理失败：${err.message}`);
+            showError(`【你可能需要从编辑器重新下载地图】${err.message}`);
             checkReadyState();
         }
     }
