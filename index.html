@@ -162,6 +162,9 @@
         <button class="process-btn" onclick="processFiles('copy-ai')" id="btn-copy-ai" disabled>
             🔍 将地图2的所有AI价值函数克隆至地图1（不会覆盖原有的）
         </button>
+        <button class="process-btn process-btn-simple" onclick="processFiles('clear-ver')" id="btn-clear-ver" disabled>
+            🧹 清除地图1的版本号（实际发布时版本号依然必须高于此地图发布过的历史版本）
+        </button>
     </div>
 
     <div class="status loading" id="loadingStatus">
@@ -272,6 +275,14 @@
                 mapInfo["version"] = "0_0";
                 mapInfo["desc"] = "";
                 mapInfo["desc_format"] = "";
+                const res = JSON.stringify(mapInfo);
+                newZip.file("edit/mapInfo.json", res);
+                newZip.file("client/mapInfo.json", res);
+            }
+            else if (mode === 'clear-ver') {
+                const mapInfoJSON = await newZip.file("edit/mapInfo.json").async("string");
+                var mapInfo = JSON.parse(mapInfoJSON);
+                mapInfo["version"] = "0_0";
                 const res = JSON.stringify(mapInfo);
                 newZip.file("edit/mapInfo.json", res);
                 newZip.file("client/mapInfo.json", res);
