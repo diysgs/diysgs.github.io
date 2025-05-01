@@ -135,7 +135,7 @@
 </head>
 <body>
 <div class="container">
-    <h1>🔗 三国杀编辑器简易工具（非官方） v1.2.0</h1>
+    <h1>🔗 三国杀编辑器简易工具（非官方） v1.3.0</h1>
     <h2>难得不糊涂</h2>
 
     <div class="upload-group">
@@ -164,6 +164,9 @@
         </button>
         <button class="process-btn process-btn-simple" onclick="processFiles('clear-ver')" id="btn-clear-ver" disabled>
             🧹 清除地图1的版本号（实际发布时版本号依然必须高于此地图发布过的历史版本）
+        </button>
+        <button class="process-btn" onclick="processFiles('replace-uuid')" id="btn-replace-uuid" disabled>
+            🧷 使地图1的ID与地图2保持一致（适用于同一地图名不小心拆成了两张地图发布的情况）
         </button>
     </div>
 
@@ -443,6 +446,17 @@
                 gameConfig1["ai_value_config"]["dir"] = oriDir;
                 const res = JSON.stringify(gameConfig1);
                 newZip.file("edit/gameConfig.json", res);
+            }
+            else if (mode === 'replace-uuid') {
+                const mapInfoJSON1 = await newZip.file("edit/mapInfo.json").async("string");
+                const mapInfoJSON2 = await zip2.file("edit/mapInfo.json").async("string");
+                var mapInfo1 = JSON.parse(mapInfoJSON1);
+                var mapInfo2 = JSON.parse(mapInfoJSON2);
+                mapInfo1["map_uuid"] = mapInfo2["map_uuid"];
+                mapInfo1["version"] = mapInfo2["version"];
+                const res = JSON.stringify(mapInfo1);
+                newZip.file("edit/mapInfo.json", res);
+                newZip.file("client/mapInfo.json", res);
             }
 
             // 生成并下载
